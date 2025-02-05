@@ -29,13 +29,6 @@ class ProfileSetup(StatesGroup):
     calories_goal = State()
 
 
-@dp.message(Command("start"))
-async def start_command(message: Message):
-    await message.answer(
-        "Привет! Я помогу тебе рассчитать нормы воды и калорий. Начни с команды /set_profile."
-    )
-
-
 @dp.message(Command("set_profile"))
 async def set_profile(message: Message, state: FSMContext):
     await message.answer("Введите ваш вес (в кг):")
@@ -45,7 +38,6 @@ async def set_profile(message: Message, state: FSMContext):
 
 @dp.message(ProfileSetup.weight)
 async def process_weight(message: Message, state: FSMContext):
-    await state.update_data(weight=message.text)
     users[message.from_user.id]["weight"] = int(message.text)
     await message.reply("Введите ваш рост (в см):")
     await state.set_state(ProfileSetup.height)
@@ -53,7 +45,6 @@ async def process_weight(message: Message, state: FSMContext):
 
 @dp.message(ProfileSetup.height)
 async def process_height(message: Message, state: FSMContext):
-    await state.update_data(height=message.text)
     users[message.from_user.id]["height"] = int(message.text)
     await message.reply("Введите ваш возраст:")
     await state.set_state(ProfileSetup.age)
@@ -61,7 +52,6 @@ async def process_height(message: Message, state: FSMContext):
 
 @dp.message(ProfileSetup.age)
 async def process_age(message: Message, state: FSMContext):
-    await state.update_data(age=message.text)
     users[message.from_user.id]["age"] = int(message.text)
     await message.reply("Введите ваш город:")
     await state.set_state(ProfileSetup.city)
@@ -69,14 +59,15 @@ async def process_age(message: Message, state: FSMContext):
 
 @dp.message(ProfileSetup.city)
 async def process_city(message: Message, state: FSMContext):
-    await state.update_data(city=message.text)
-    users[message.from_user.id]["city"] = message.text
+    user_id = message.from_user.id
+    users[user_id]["city"] = message.text
+    users[user_id]["activity"] = 0
     response = requests.get(
         f"https://api.openweathermap.org/data/2.5/weather?q={await translate_from_rus_to_eng(users[message.from_user.id]['city'])}&appid={OPEN_WEATHER_API_KEY}"
     )
     data = response.json()
     if response.status_code == 401:
-        return None, data
+        return
     users[message.from_user.id]["temp"] = round(data["main"]["temp"] - 273.15, 1)
 
     calculate_goals(users[message.from_user.id])
@@ -101,7 +92,7 @@ async def log_water(message: Message, command: CommandObject):
     amount = int(command.args.split(" ")[0])
     user_id = message.from_user.id
     users[user_id]["logged_water"] = users[user_id].get("logged_water", 0) + amount
-    remaining = users[user_id]["water_goal"] - users[user_id]["logged_water"]
+    remaining = users[user_id]["water_added_goal"] - users[user_id]["logged_water"]
     await message.answer(
         f"Вы выпили {amount} мл воды.\n" f"Осталось выпить {remaining} мл воды.\n"
     )
@@ -120,7 +111,7 @@ async def log_food(message: Message, command: CommandObject):
         users[user_id].get("logged_calories", 0) + food_info
     )
 
-    await message.answer(f"Вы съели {query}, это {food_info} калорий.\n")
+    await message.answer(f"Вы съели {query}\n" f"Записано {food_info} калорий.\n")
 
 
 @dp.message(Command("log_workout"))
@@ -133,11 +124,21 @@ async def log_workout(message: Message, command: CommandObject):
     exercise_info = await get_exercise_info(query, users[user_id])
 
     minutes = int(re.search(r"\d+", query).group())
-    users[user_id]["activity"] = minutes
+    users[user_id]["activity"] += minutes
+    water_diff = (
+        users[user_id]["water_goal"]
+        + 200 * (users[user_id]["activity"] // 30)
+        - users[user_id]["water_added_goal"]
+    )
     users[user_id]["water_added_goal"] = users[user_id]["water_goal"] + 200 * (
         users[user_id]["activity"] // 30
     )
-    users[user_id]["calories_added_goal"] = users[user_id]["calories_goal"] + 200 * (
+    calories_diff = (
+        users[user_id]["calories_goal"]
+        + 300 * (users[user_id]["activity"] // 30)
+        - users[user_id]["calories_added_goal"]
+    )
+    users[user_id]["calories_added_goal"] = users[user_id]["calories_goal"] + 300 * (
         users[user_id]["activity"] // 30
     )
     users[user_id]["burned_calories"] = exercise_info
@@ -145,7 +146,11 @@ async def log_workout(message: Message, command: CommandObject):
         users[user_id].get("logged_calories", 0) - exercise_info
     )
 
-    await message.answer(f"Вы сделали {query} и сожгли {exercise_info} калорий")
+    await message.answer(
+        f"Вы сделали {query} и сожгли {exercise_info} калорий\n"
+        f"Дополнительно: выпейте {water_diff} мл воды\n"
+        f"Норма калорий повышена на {calories_diff}"
+    )
 
 
 @dp.message(Command("check_progress"))

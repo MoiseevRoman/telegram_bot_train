@@ -15,9 +15,13 @@ def calculate_goals(user_data):
     if user_data["temp"] > 25:
         user_data["water_goal"] += 500
 
+    user_data["water_added_goal"] = user_data["water_goal"]
+
     user_data["calories_goal"] = (
         10 * user_data["weight"] + 6.25 * user_data["height"] - 5 * user_data["age"]
     )
+
+    user_data["calories_added_goal"] = user_data["calories_goal"]
 
 
 async def get_food_info(query):
