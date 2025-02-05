@@ -1,18 +1,23 @@
-from googletrans import Translator
 import requests
-from config import NUTRITIONIX_APP_ID, NUTRITIONIX_API_KEY
+from googletrans import Translator
+
+from config import NUTRITIONIX_API_KEY, NUTRITIONIX_APP_ID
+
 
 async def translate_from_rus_to_eng(text):
     async with Translator() as translator:
-        translated = await translator.translate(text, src='ru', dest='en')
+        translated = await translator.translate(text, src="ru", dest="en")
         return translated.text
 
-def calculate_goals(user_data):
-    user_data['water_goal'] = user_data['weight'] * 30
-    if user_data['temp'] > 25:
-        user_data['water_goal'] += 500
 
-    user_data['calories_goal'] = 10 * user_data['weight'] + 6.25 * user_data['height'] - 5 * user_data['age']
+def calculate_goals(user_data):
+    user_data["water_goal"] = user_data["weight"] * 30
+    if user_data["temp"] > 25:
+        user_data["water_goal"] += 500
+
+    user_data["calories_goal"] = (
+        10 * user_data["weight"] + 6.25 * user_data["height"] - 5 * user_data["age"]
+    )
 
 
 async def get_food_info(query):
@@ -36,6 +41,7 @@ async def get_food_info(query):
     else:
         print(f"Ошибка: {response.status_code}, {response.text}")
         return None
+
 
 async def get_exercise_info(query, user_data):
     query = await translate_from_rus_to_eng(query)
