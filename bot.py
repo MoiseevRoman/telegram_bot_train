@@ -62,6 +62,7 @@ async def process_city(message: Message, state: FSMContext):
     user_id = message.from_user.id
     users[user_id]["city"] = message.text
     users[user_id]["activity"] = 0
+    users[user_id]["burned_calories"] = 0
     response = requests.get(
         f"https://api.openweathermap.org/data/2.5/weather?q={await translate_from_rus_to_eng(users[message.from_user.id]['city'])}&appid={OPEN_WEATHER_API_KEY}"
     )
@@ -141,10 +142,7 @@ async def log_workout(message: Message, command: CommandObject):
     users[user_id]["calories_added_goal"] = users[user_id]["calories_goal"] + 300 * (
         users[user_id]["activity"] // 30
     )
-    users[user_id]["burned_calories"] = exercise_info
-    users[user_id]["logged_calories"] = (
-        users[user_id].get("logged_calories", 0) - exercise_info
-    )
+    users[user_id]["burned_calories"] += exercise_info
 
     await message.answer(
         f"Вы сделали {query} и сожгли {exercise_info} калорий\n"
